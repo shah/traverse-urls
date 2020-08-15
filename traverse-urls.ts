@@ -1,9 +1,22 @@
 import * as nf from "node-fetch";
 import UserAgent from 'user-agents';
 import mime from "whatwg-mimetype";
+import * as p from "@shah/ts-pipe"
+
+export interface VisitContext {
+    readonly position: number;
+}
+
+export class RemoveUrlTrackingCodes implements p.PipeUnion<VisitContext, string> {
+    static readonly singleton = new RemoveUrlTrackingCodes();
+    static readonly pattern = /(?<=&|\?)utm_.*?(&|$)/igm;
+
+    async flow(ctx: VisitContext, url: string): Promise<string> {
+        return url.replace(RemoveUrlTrackingCodes.pattern, "");
+    }
+}
 
 const metaRefreshPattern = '(CONTENT|content)=["\']0;[ ]*(URL|url)=(.*?)(["\']\s*>)';
-const urlTrackingCodesPattern = /(?<=&|\?)utm_.*?(&|$)/igm;
 
 export interface VisitResult {
     readonly url: string;
@@ -75,13 +88,13 @@ export interface TraverseOptions {
     readonly maxRedirectDepth: number;
     readonly fetchTimeOut: number;
     readonly saveContentRedirectText: boolean;
-    prepareUrlForFetch?(originalURL: string, position: number): string;
+    readonly prepareUrlForFetch?: p.PipeUnion<VisitContext, string>;
     extractMetaRefreshUrl(html: string): string | null;
     isRedirect(status: number): boolean;
 }
 
 async function visit(originalURL: string, position: number, options: TraverseOptions): Promise<ConstrainedVisitResult> {
-    const url = options.prepareUrlForFetch ? options.prepareUrlForFetch(originalURL, position) : originalURL;
+    const url = options.prepareUrlForFetch ? await options.prepareUrlForFetch.flow({ position: position }, originalURL) : originalURL;
     const response = await nf.default(url, {
         redirect: 'manual',
         follow: 0,
@@ -121,16 +134,14 @@ export class TypicalTraverseOptions implements TraverseOptions {
     readonly maxRedirectDepth: number;
     readonly fetchTimeOut: number;
     readonly saveContentRedirectText: boolean;
+    readonly prepareUrlForFetch: p.PipeUnion<VisitContext, string>;
 
     constructor({ userAgent, maxRedirectDepth, fetchTimeOut, saveContentRedirectText: cacheContentRedirectText }: Partial<TraverseOptions>) {
         this.userAgent = userAgent || new UserAgent();
         this.maxRedirectDepth = typeof maxRedirectDepth === "undefined" ? 10 : maxRedirectDepth;
         this.fetchTimeOut = typeof fetchTimeOut === "undefined" ? 2500 : fetchTimeOut;
         this.saveContentRedirectText = typeof cacheContentRedirectText === "undefined" ? false : cacheContentRedirectText;
-    }
-
-    prepareUrlForFetch(url: string): string {
-        return url.replace(urlTrackingCodesPattern, "")
+        this.prepareUrlForFetch = p.pipe(RemoveUrlTrackingCodes.singleton);
     }
 
     extractMetaRefreshUrl(html: string): string | null {
