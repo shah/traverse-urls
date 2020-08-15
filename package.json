@@ -1,6 +1,6 @@
 {
     "name": "@shah/traverse-urls",
-    "version": "0.5.0",
+    "version": "0.5.1",
     "description": "Granular URL traversal",
     "main": "dist/traverse-urls.js",
     "types": "dist/traverse-urls.d.ts",
