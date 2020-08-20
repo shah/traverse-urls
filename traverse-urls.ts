@@ -32,11 +32,11 @@ export function isVisitError(o: VisitResult): o is VisitError {
 
 export interface VisitSuccess extends VisitResult {
     readonly httpStatus: number;
-    readonly httpHeaders: nf.Headers;
 }
 
 export interface RedirectResult extends VisitSuccess {
     readonly redirectUrl: string;
+    readonly httpResponse?: nf.Response;
 }
 
 export function isRedirectResult(o: VisitResult): o is RedirectResult {
@@ -64,6 +64,7 @@ export function isContentRedirectResult(o: VisitResult): o is ContentRedirectRes
 
 export interface TerminalResult extends VisitSuccess {
     readonly terminalResult: boolean;
+    readonly httpResponse: nf.Response;
     readonly contentType: string;
     readonly mimeType: mime;
 }
@@ -88,6 +89,7 @@ export interface TraverseOptions {
     readonly maxRedirectDepth: number;
     readonly fetchTimeOut: number;
     readonly saveContentRedirectText: boolean;
+    readonly saveHttpRedirectResponses: boolean;
     readonly prepareUrlForFetch?: p.PipeUnion<VisitContext, string>;
     extractMetaRefreshUrl(html: string): string | null;
     isRedirect(status: number): boolean;
@@ -112,7 +114,7 @@ async function visit(originalURL: string, position: number, options: TraverseOpt
                 error: new Error(`${url} responded with status ${response.status} but no location header`)
             }
         }
-        return { url: url, httpRedirect: true, httpStatus: response.status, redirectUrl: location, httpHeaders: response.headers };
+        return { url: url, httpRedirect: true, httpStatus: response.status, redirectUrl: location, httpResponse: options.saveHttpRedirectResponses ? response : undefined };
     }
     const contentType = response.headers.get("Content-Type")!
     const mimeType = new mime(contentType);
@@ -121,11 +123,11 @@ async function visit(originalURL: string, position: number, options: TraverseOpt
             const text = await response.text();
             const redirectUrl = options.extractMetaRefreshUrl(text);
             return redirectUrl ?
-                { url: url, metaRefreshRedirect: true, httpStatus: response.status, redirectUrl: redirectUrl, contentText: options.saveContentRedirectText ? text : undefined, httpHeaders: response.headers, contentType: contentType, mimeType: mimeType } :
-                { url: url, httpStatus: response.status, terminalResult: true, terminalTextContentResult: true, contentText: text, httpHeaders: response.headers, contentType: contentType, mimeType: mimeType }
+                { url: url, metaRefreshRedirect: true, httpStatus: response.status, redirectUrl: redirectUrl, contentText: options.saveContentRedirectText ? text : undefined, httpResponse: options.saveHttpRedirectResponses ? response : undefined, contentType: contentType, mimeType: mimeType } :
+                { url: url, httpStatus: response.status, terminalResult: true, terminalTextContentResult: true, contentText: text, httpResponse: response, contentType: contentType, mimeType: mimeType }
         }
     }
-    return { url: url, httpStatus: response.status, httpHeaders: response.headers, terminalResult: true, contentType: contentType, mimeType: mimeType }
+    return { url: url, httpStatus: response.status, httpResponse: response, terminalResult: true, contentType: contentType, mimeType: mimeType }
 }
 
 export class TypicalTraverseOptions implements TraverseOptions {
@@ -134,13 +136,15 @@ export class TypicalTraverseOptions implements TraverseOptions {
     readonly maxRedirectDepth: number;
     readonly fetchTimeOut: number;
     readonly saveContentRedirectText: boolean;
+    readonly saveHttpRedirectResponses: boolean;
     readonly prepareUrlForFetch: p.PipeUnion<VisitContext, string>;
 
-    constructor({ userAgent, maxRedirectDepth, fetchTimeOut, saveContentRedirectText: cacheContentRedirectText }: Partial<TraverseOptions>) {
+    constructor({ userAgent, maxRedirectDepth, fetchTimeOut, saveContentRedirectText: cacheContentRedirectText, saveHttpRedirectResponses }: Partial<TraverseOptions>) {
         this.userAgent = userAgent || new UserAgent();
         this.maxRedirectDepth = typeof maxRedirectDepth === "undefined" ? 10 : maxRedirectDepth;
         this.fetchTimeOut = typeof fetchTimeOut === "undefined" ? 2500 : fetchTimeOut;
         this.saveContentRedirectText = typeof cacheContentRedirectText === "undefined" ? false : cacheContentRedirectText;
+        this.saveHttpRedirectResponses = typeof saveHttpRedirectResponses === "undefined" ? false : saveHttpRedirectResponses;
         this.prepareUrlForFetch = p.pipe(RemoveUrlTrackingCodes.singleton);
     }
 
