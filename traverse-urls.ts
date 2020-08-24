@@ -210,16 +210,19 @@ export function isCallResult(o: VisitResult): o is CallResultSuccess {
 export interface CallOptions {
     readonly userAgent: UserAgent;
     readonly fetchTimeOut: number;
+    readonly validStatuses: number[];
 }
 
 export class TypicalCallOptions implements CallOptions {
     static readonly singleton = new TypicalCallOptions({});
     readonly userAgent: UserAgent;
     readonly fetchTimeOut: number;
+    readonly validStatuses: number[];
 
-    constructor({ userAgent, fetchTimeOut }: Partial<CallOptions>) {
+    constructor({ userAgent, fetchTimeOut, validStatuses }: Partial<CallOptions>) {
         this.userAgent = userAgent || new UserAgent();
         this.fetchTimeOut = typeof fetchTimeOut === "undefined" ? 60000 : fetchTimeOut;
+        this.validStatuses = validStatuses || [200];
     }
 };
 
@@ -232,17 +235,19 @@ export async function call(url: string, postBodyPOJO: any, options = TypicalCall
             body: JSON.stringify(postBodyPOJO),
             headers: {
                 'User-Agent': options.userAgent.toString(),
+                'Accept': 'application/json',
                 'Content-Type': 'application/json;charset=UTF-8',
             }
         });
 
-        if (response.status == 200) {
+        if (options.validStatuses.find(s => s == response.status)) {
             const contentType = response.headers.get("Content-Type")!
             const mimeType = new mime(contentType);
+            const pojo = await response.json();
             return {
                 terminalResult: true,
                 url: url,
-                callResultPOJO: await response.json(),
+                callResultPOJO: (pojo.body && typeof pojo.body === "string") ? JSON.parse(pojo.body) : pojo,
                 postBodyPOJO: postBodyPOJO,
                 contentType: contentType,
                 mimeType: mimeType,
