@@ -188,3 +188,81 @@ export async function traverse(originalURL: string, options = TypicalTraverseOpt
     }
     return visits;
 }
+
+export interface CallError extends VisitError {
+    readonly postBodyPOJO: any;
+    readonly postResponse?: nf.Response;
+}
+
+export function isCallError(o: VisitResult): o is CallError {
+    return "postBodyPOJO" in o;
+}
+
+export interface CallResultSuccess extends TerminalResult {
+    readonly postBodyPOJO: any;
+    readonly callResultPOJO: any;
+}
+
+export function isCallResult(o: VisitResult): o is CallResultSuccess {
+    return "callResultPOJO" in o;
+}
+
+export interface CallOptions {
+    readonly userAgent: UserAgent;
+    readonly fetchTimeOut: number;
+}
+
+export class TypicalCallOptions implements CallOptions {
+    static readonly singleton = new TypicalCallOptions({});
+    readonly userAgent: UserAgent;
+    readonly fetchTimeOut: number;
+
+    constructor({ userAgent, fetchTimeOut }: Partial<CallOptions>) {
+        this.userAgent = userAgent || new UserAgent();
+        this.fetchTimeOut = typeof fetchTimeOut === "undefined" ? 60000 : fetchTimeOut;
+    }
+};
+
+export async function call(url: string, postBodyPOJO: any, options = TypicalCallOptions.singleton): Promise<CallError | CallResultSuccess> {
+    try {
+        const response = await nf.default(url, {
+            method: 'post',
+            redirect: 'follow',
+            timeout: options.fetchTimeOut,
+            body: JSON.stringify(postBodyPOJO),
+            headers: {
+                'User-Agent': options.userAgent.toString(),
+                'Content-Type': 'application/json;charset=UTF-8',
+            }
+        });
+
+        if (response.status == 200) {
+            const contentType = response.headers.get("Content-Type")!
+            const mimeType = new mime(contentType);
+            return {
+                terminalResult: true,
+                url: url,
+                callResultPOJO: await response.json(),
+                postBodyPOJO: postBodyPOJO,
+                contentType: contentType,
+                mimeType: mimeType,
+                httpResponse: response,
+                httpStatus: response.status,
+            }
+        } else {
+            return {
+                url,
+                error: new Error("HTTP Status is not 200: " + response.status),
+                postBodyPOJO,
+                postResponse: response
+            }
+        }
+
+    } catch (err) {
+        return {
+            url,
+            error: err,
+            postBodyPOJO
+        }
+    }
+}
