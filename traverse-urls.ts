@@ -209,35 +209,65 @@ export function isCallResult(o: VisitResult): o is CallResultSuccess {
 
 export interface CallOptions {
     readonly userAgent: UserAgent;
+    readonly httpMethod: string;
     readonly fetchTimeOut: number;
     readonly validStatuses: number[];
+    readonly headers: { [key: string]: string };
+    readonly prepareBody: (pojo: any) => any;
 }
 
-export class TypicalCallOptions implements CallOptions {
-    static readonly singleton = new TypicalCallOptions({});
+export class JsonCallOptions implements CallOptions {
+    static readonly singleton = new JsonCallOptions({});
+    readonly httpMethod: string;
     readonly userAgent: UserAgent;
     readonly fetchTimeOut: number;
     readonly validStatuses: number[];
+    readonly headers: { [key: string]: string };
+    readonly prepareBody: (pojo: any) => any;
 
-    constructor({ userAgent, fetchTimeOut, validStatuses }: Partial<CallOptions>) {
+    constructor({ httpMethod, userAgent, fetchTimeOut, validStatuses, headers, prepareBody }: Partial<CallOptions>) {
+        this.httpMethod = httpMethod || 'post';
         this.userAgent = userAgent || new UserAgent();
         this.fetchTimeOut = typeof fetchTimeOut === "undefined" ? 60000 : fetchTimeOut;
         this.validStatuses = validStatuses || [200];
+        this.headers = headers || {
+            'User-Agent': this.userAgent.toString(),
+            'Accept': 'application/json',
+            'Content-Type': 'application/json;charset=UTF-8',
+        }
+        this.prepareBody = prepareBody || ((pojo: any): any => { return JSON.stringify(pojo); });
     }
 };
 
-export async function call(url: string, postBodyPOJO: any, options = TypicalCallOptions.singleton): Promise<CallError | CallResultSuccess> {
+export class FormDataCallOptions implements CallOptions {
+    static readonly singleton = new FormDataCallOptions({});
+    readonly httpMethod: string;
+    readonly userAgent: UserAgent;
+    readonly fetchTimeOut: number;
+    readonly validStatuses: number[];
+    readonly headers: { [key: string]: string };
+    readonly prepareBody: (pojo: any) => any;
+
+    constructor({ httpMethod, userAgent, fetchTimeOut, validStatuses, headers, prepareBody }: Partial<CallOptions>) {
+        this.httpMethod = httpMethod || 'post';
+        this.userAgent = userAgent || new UserAgent();
+        this.fetchTimeOut = typeof fetchTimeOut === "undefined" ? 60000 : fetchTimeOut;
+        this.validStatuses = validStatuses || [200];
+        this.headers = headers || {
+            'User-Agent': this.userAgent.toString(),
+        }
+        this.prepareBody = prepareBody || ((pojo: any): any => { return pojo; });
+    }
+};
+
+export async function call(url: string, postBodyPOJO: any, options = JsonCallOptions.singleton): Promise<CallError | CallResultSuccess> {
     try {
         const response = await nf.default(url, {
-            method: 'post',
+            method: options.httpMethod,
             redirect: 'follow',
             timeout: options.fetchTimeOut,
-            body: JSON.stringify(postBodyPOJO),
-            headers: {
-                'User-Agent': options.userAgent.toString(),
-                'Accept': 'application/json',
-                'Content-Type': 'application/json;charset=UTF-8',
-            }
+            body: options.prepareBody(postBodyPOJO),
+            headers: options.headers
         });
 
         if (options.validStatuses.find(s => s == response.status)) {

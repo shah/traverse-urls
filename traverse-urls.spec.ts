@@ -44,7 +44,7 @@ export class TestSuite {
         const result = await tru.call(
             "https://meshb.nlm.nih.gov/api/MOD",
             { input },
-            new tru.TypicalCallOptions({ fetchTimeOut: 120000 })
+            new tru.JsonCallOptions({ fetchTimeOut: 120000 })
         );
         Expect(result).toBeDefined();
         Expect(tru.isCallResult(result)).toBe(true);
