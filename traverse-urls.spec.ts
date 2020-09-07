@@ -39,7 +39,7 @@ export class TestSuite {
     @Test("Call API and return results")
     async testCallAPI(): Promise<void> {
         // https://www.medigy.com/news/2020/08/21/ehrintelligence.com-how-va-is-attempting-to-increase-interoperability-boost-its-ehr-system/
-        const title = "How VA is Attempting to Increase Interoperability, Boost its EHR System";
+        // const title = "How VA is Attempting to Increase Interoperability, Boost its EHR System";
         const input = "While the Department of Veterans Affairs (VA) has faced considerable health IT challenges in the past few years, the VA is attempting to increase its interoperability and enhance its health information exchange and new EHR system. The OIG HIE report found training challenges, the need for increased community partners, the use of community coordinators, and technology issues that need to be addressed to enhance the VA’s ability to effectively utilize its HIEs and the ability to exchange patient data. These reports and a basic need for increased interoperability have triggered a series of VA health IT advancements and optimizations over the past few months. Most recently, the organization has developed a joint HIE in partnership with the Department of Defense (DoD) and a Veterans Data Integration and Federation Enterprise Platform to promote interoperability. The VA has also looked into robotic process automation to help transfer its paper records over to its new EHR system.";
         const result = await tru.call(
             "https://meshb.nlm.nih.gov/api/MOD",

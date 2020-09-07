@@ -11,7 +11,7 @@ export class RemoveUrlTrackingCodes implements p.PipeUnion<VisitContext, string>
     static readonly singleton = new RemoveUrlTrackingCodes();
     static readonly pattern = /(?<=&|\?)utm_.*?(&|$)/igm;
 
-    async flow(ctx: VisitContext, url: string): Promise<string> {
+    async flow(_: VisitContext, url: string): Promise<string> {
         return url.replace(RemoveUrlTrackingCodes.pattern, "");
     }
 }
